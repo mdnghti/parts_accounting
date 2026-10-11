@@ -28,6 +28,8 @@ def get_connection(db_path: Path | str | None = None) -> sqlite3.Connection:
     conn = sqlite3.connect(str(target_path))
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON;")
+    # Реєстрація функції переведення в нижній регістр для повноцінного пошуку кирилицею
+    conn.create_function("py_lower", 1, lambda s: s.lower() if s is not None else "")
     return conn
 
 

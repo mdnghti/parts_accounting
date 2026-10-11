@@ -332,9 +332,14 @@ def get_parts(
             where_clauses.append("cm.brand_id = ?")
             params.append(brand_id)
 
+        try:
+            c.create_function("py_lower", 1, lambda s: s.lower() if s is not None else "")
+        except Exception:
+            pass
+
         if search:
-            search_pattern = f"%{search.strip()}%"
-            where_clauses.append("(p.part_number LIKE ? OR p.name LIKE ?)")
+            search_pattern = f"%{search.strip().lower()}%"
+            where_clauses.append("(py_lower(p.part_number) LIKE ? OR py_lower(p.name) LIKE ?)")
             params.extend([search_pattern, search_pattern])
 
         if category_id is not None:
