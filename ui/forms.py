@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List, Optional
+from typing import Any, List, Optional
 from PySide6.QtCore import QDateTime, Qt
 from PySide6.QtWidgets import (
     QComboBox,
