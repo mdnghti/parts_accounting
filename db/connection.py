@@ -23,8 +23,12 @@ def get_db_path() -> Path:
 
 
 def get_connection(db_path: Path | str | None = None) -> sqlite3.Connection:
-    """Створення та налаштування з'єднання з SQLite."""
+    """Створення та налаштування з'єднання з SQLite. Автоматично ініціалізує БД, якщо її ще немає."""
     target_path = Path(db_path) if db_path else get_db_path()
+    is_new_or_empty = (not target_path.exists()) or (target_path.stat().st_size == 0)
+    if is_new_or_empty:
+        init_db(target_path)
+
     conn = sqlite3.connect(str(target_path))
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON;")
@@ -41,12 +45,19 @@ def init_db(db_path: Path | str | None = None) -> None:
     with open(schema_file, "r", encoding="utf-8") as f:
         schema_sql = f.read()
 
-    with get_connection(target_path) as conn:
-        conn.executescript(schema_sql)
+    conn = sqlite3.connect(str(target_path))
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON;")
+    conn.create_function("py_lower", 1, lambda s: s.lower() if s is not None else "")
+    try:
+        with conn:
+            conn.executescript(schema_sql)
 
-        # Якщо база нова або порожня — заповнюємо початковими даними
-        cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM users")
-        if cursor.fetchone()[0] == 0:
-            from db.seed_data import seed_initial_data
-            seed_initial_data(conn)
+            # Якщо база нова або порожня — заповнюємо початковими даними
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM users")
+            if cursor.fetchone()[0] == 0:
+                from db.seed_data import seed_initial_data
+                seed_initial_data(conn)
+    finally:
+        conn.close()
