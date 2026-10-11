@@ -4,15 +4,29 @@ from pathlib import Path
 # Додаємо корінь проекту в sys.path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from db.connection import get_db_path, init_db
+from PySide6.QtWidgets import QApplication
+
+from db.connection import init_db
+from ui.login_dialog import LoginDialog
+from ui.main_window import MainWindow
 
 
 def main() -> None:
     """Точка входу додатку."""
-    print("Ініціалізація бази даних...")
+    # Ініціалізація БД (створює файл та початкові дані, якщо їх нема)
     init_db()
-    db_path = get_db_path()
-    print(f"База даних готова: {db_path} (існує: {db_path.exists()})")
+
+    app = QApplication(sys.argv)
+    app.setApplicationName("PartsAccounting")
+
+    login_dlg = LoginDialog()
+    if login_dlg.exec():
+        user = login_dlg.user
+        window = MainWindow(user)
+        window.show()
+        sys.exit(app.exec())
+    else:
+        sys.exit(0)
 
 
 if __name__ == "__main__":
