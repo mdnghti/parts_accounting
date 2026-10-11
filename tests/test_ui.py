@@ -122,7 +122,8 @@ def test_main_window_role_permissions(qapp):
     win_admin = MainWindow(admin_user)
     assert win_admin.del_part_btn.isEnabled() is True
     assert win_admin.del_cat_btn.isEnabled() is True
-    win_admin.close()
+    win_admin.deleteLater()
+    qapp.processEvents()
 
     # Комірник має вимкнені кнопки видалення
     win_keeper = MainWindow(keeper_user)
@@ -131,4 +132,5 @@ def test_main_window_role_permissions(qapp):
     assert win_keeper.del_brand_btn.isEnabled() is False
     assert win_keeper.del_sup_btn.isEnabled() is False
     assert win_keeper.del_cust_btn.isEnabled() is False
-    win_keeper.close()
+    win_keeper.deleteLater()
+    qapp.processEvents()

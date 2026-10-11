@@ -68,6 +68,7 @@ from ui.models import (
     ModelsTableModel,
     PartsTableModel,
 )
+from ui.reports_widget import ReportsWidget
 
 
 class MainWindow(QMainWindow):
@@ -87,7 +88,7 @@ class MainWindow(QMainWindow):
         self.refresh_all_data()
 
     def _init_ui(self) -> None:
-        central_widget = QWidget()
+        central_widget = QWidget(self)
         self.setCentralWidget(central_widget)
         main_layout = QVBoxLayout(central_widget)
 
@@ -106,7 +107,7 @@ class MainWindow(QMainWindow):
         main_layout.addLayout(top_bar)
 
         # Вкладки додатку
-        self.tabs = QTabWidget()
+        self.tabs = QTabWidget(self)
         main_layout.addWidget(self.tabs)
 
         # 1. Вкладка "Склад та запчастини"
@@ -117,6 +118,10 @@ class MainWindow(QMainWindow):
 
         # 3. Вкладка "Довідники"
         self._init_catalogs_tab()
+
+        # 4. Вкладка "Звіти"
+        self.reports_widget = ReportsWidget(self)
+        self.tabs.addTab(self.reports_widget, "📊 Звіти")
 
         # Статус-бар
         self.status_bar = QStatusBar()
@@ -346,12 +351,16 @@ class MainWindow(QMainWindow):
         self.view_doc_btn = QPushButton("🔍 Переглянути накладну")
         self.view_doc_btn.clicked.connect(self._view_document)
 
+        self.print_doc_btn = QPushButton("🖨️ Друк накладної (PDF / Excel)")
+        self.print_doc_btn.clicked.connect(self._print_document)
+
         self.refresh_docs_btn = QPushButton("🔄 Оновити список")
         self.refresh_docs_btn.clicked.connect(self._load_documents)
 
         actions_layout.addWidget(self.incoming_doc_btn)
         actions_layout.addWidget(self.outgoing_doc_btn)
         actions_layout.addWidget(self.view_doc_btn)
+        actions_layout.addWidget(self.print_doc_btn)
         actions_layout.addStretch()
         actions_layout.addWidget(self.refresh_docs_btn)
         layout.addLayout(actions_layout)
@@ -385,6 +394,59 @@ class MainWindow(QMainWindow):
         if full_doc:
             dlg = DocumentViewDialog(self, document=full_doc)
             dlg.exec()
+
+    def _print_document(self) -> None:
+        """Експорт друкованої накладної у вибраний формат (PDF або Excel)."""
+        from pathlib import Path
+        from PySide6.QtWidgets import QFileDialog
+        from db.repositories import get_document_by_id
+        from reports.services import generate_report
+
+        idx = self.docs_table_view.selectionModel().selectedRows()
+        if not idx:
+            QMessageBox.information(self, "Повідомлення", "Виберіть накладну для друку.")
+            return
+
+        doc_summary = self.docs_table_model.get_document_at(idx[0].row())
+        if not doc_summary:
+            return
+
+        full_doc = get_document_by_id(doc_summary.id)
+        if not full_doc:
+            return
+
+        # Запит формату: PDF за замовчуванням
+        reply = QMessageBox.question(
+            self,
+            "Формат друкованої накладної",
+            f"Сформувати накладну {full_doc.doc_number} у форматі PDF?\n"
+            "(Натисніть 'Yes' для PDF, або 'No' для Excel)",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel,
+        )
+        if reply == QMessageBox.StandardButton.Cancel:
+            return
+
+        fmt = "pdf" if reply == QMessageBox.StandardButton.Yes else "excel"
+        ext = ".pdf" if fmt == "pdf" else ".xlsx"
+        filter_str = "PDF Files (*.pdf)" if fmt == "pdf" else "Excel Files (*.xlsx)"
+
+        clean_num = full_doc.doc_number.replace("/", "_").replace("\\", "_")
+        default_filename = f"nakladna_{clean_num}{ext}"
+
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Зберегти друковану накладну",
+            str(Path.home() / default_filename),
+            filter_str,
+        )
+        if not file_path:
+            return
+
+        try:
+            saved = generate_report("invoice", fmt, file_path, document=full_doc)
+            QMessageBox.information(self, "Успіх", f"Друковану накладну збережено:\n{saved}")
+        except Exception as e:
+            QMessageBox.critical(self, "Помилка", f"Не вдалося згенерувати накладну:\n{str(e)}")
 
     # ==========================================
     # ВКЛАДКА 3: ДОВІДНИКИ (КАТЕГОРІЇ, АВТО, КОНТРАГЕНТИ)
